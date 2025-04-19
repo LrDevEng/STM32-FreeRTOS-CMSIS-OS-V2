@@ -54,14 +54,14 @@ PCD_HandleTypeDef hpcd_USB_FS;
 osThreadId_t Task1Handle;
 const osThreadAttr_t Task1_attributes = {
   .name = "Task1",
-  .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityNormal,
+  .stack_size = 256 * 4,
+  .priority = (osPriority_t) osPriorityNormal2,
 };
 /* Definitions for Task2 */
 osThreadId_t Task2Handle;
 const osThreadAttr_t Task2_attributes = {
   .name = "Task2",
-  .stack_size = 128 * 4,
+  .stack_size = 256 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* USER CODE BEGIN PV */
@@ -507,12 +507,19 @@ void Task_action(char message)
 void StartTask1(void *argument)
 {
   /* USER CODE BEGIN 5 */
+  osPriority_t prioTask2;
+
   /* Infinite loop */
   for(;;)
   {
+	prioTask2 = osThreadGetPriority(Task2Handle);
+
 	HAL_GPIO_WritePin(LD7_GPIO_Port, LD7_Pin, GPIO_PIN_SET);
 	Task_action('1');
-    osDelay(1000);
+
+	osThreadSetPriority(Task2Handle, prioTask2+1);
+
+    HAL_Delay(1000); // keep task 1 busy for 1s - usually not good practice
   }
   /* USER CODE END 5 */
 }
@@ -527,13 +534,17 @@ void StartTask1(void *argument)
 void StartTask2(void *argument)
 {
   /* USER CODE BEGIN StartTask2 */
+  osPriority_t myPrio;
+
   /* Infinite loop */
   for(;;)
   {
-	osDelay(500);
+	myPrio = osThreadGetPriority(Task2Handle);
+
     HAL_GPIO_WritePin(LD7_GPIO_Port, LD7_Pin, GPIO_PIN_RESET);
 	Task_action('2');
-	osDelay(500);
+
+	osThreadSetPriority(Task2Handle, myPrio-2);
   }
   /* USER CODE END StartTask2 */
 }
