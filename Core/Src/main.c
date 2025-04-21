@@ -548,9 +548,13 @@ void StartReceiver1(void *argument)
   for(;;)
   {
       Task_action('r');
-      r1_State = osMessageQueueGet(Queue1Handle, &msg, NULL, 2000);
-      Task_action(msg+48);
-      HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
+      r1_State = osMessageQueueGet(Queue1Handle, &msg, NULL, osWaitForever);
+
+      if(r1_State == osOK)
+      {
+	  Task_action(msg+48);
+	  HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
+      }
   }
   /* USER CODE END StartReceiver1 */
 }

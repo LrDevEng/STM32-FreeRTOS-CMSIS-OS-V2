@@ -9,6 +9,6 @@
 ../Core/Src/main.c:450:13:MX_GPIO_Init	1
 ../Core/Src/main.c:502:6:Task_action	1
 ../Core/Src/main.c:516:6:StartSender1	2
-../Core/Src/main.c:542:6:StartReceiver1	1
-../Core/Src/main.c:566:6:HAL_TIM_PeriodElapsedCallback	2
-../Core/Src/main.c:584:6:Error_Handler	1
+../Core/Src/main.c:542:6:StartReceiver1	2
+../Core/Src/main.c:570:6:HAL_TIM_PeriodElapsedCallback	2
+../Core/Src/main.c:588:6:Error_Handler	1
