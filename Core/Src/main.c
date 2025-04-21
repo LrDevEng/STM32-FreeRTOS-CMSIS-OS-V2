@@ -62,6 +62,13 @@ osThreadId_t Receiver1Handle;
 const osThreadAttr_t Receiver1_attributes = {
   .name = "Receiver1",
   .stack_size = 256 * 4,
+  .priority = (osPriority_t) osPriorityAboveNormal,
+};
+/* Definitions for Sender2 */
+osThreadId_t Sender2Handle;
+const osThreadAttr_t Sender2_attributes = {
+  .name = "Sender2",
+  .stack_size = 256 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* Definitions for Queue1 */
@@ -83,6 +90,7 @@ static void MX_I2C2_Init(void);
 static void MX_USART2_UART_Init(void);
 void StartSender1(void *argument);
 void StartReceiver1(void *argument);
+void StartSender2(void *argument);
 
 /* USER CODE BEGIN PFP */
 void Task_action(char message);
@@ -160,6 +168,9 @@ int main(void)
 
   /* creation of Receiver1 */
   Receiver1Handle = osThreadNew(StartReceiver1, NULL, &Receiver1_attributes);
+
+  /* creation of Sender2 */
+  Sender2Handle = osThreadNew(StartSender2, NULL, &Sender2_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -516,18 +527,16 @@ void Task_action(char message)
 void StartSender1(void *argument)
 {
   /* USER CODE BEGIN 5 */
-  uint8_t msg = 0;
+  uint8_t msg = 1;
 
   /* Infinite loop */
   for(;;)
   {
+      osDelay(1000);
       Task_action('s');
       osMessageQueuePut(Queue1Handle, &msg, 0, 200);
-      if(++msg >9)
-      {
-	  msg = 0;
-      }
-      osDelay(1000);
+      osThreadResume(Sender2Handle);
+      osThreadSuspend(Sender1Handle);
   }
   /* USER CODE END 5 */
 }
@@ -553,10 +562,42 @@ void StartReceiver1(void *argument)
       if(r1_State == osOK)
       {
 	  Task_action(msg+48);
-	  HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
+	  if(msg == 1)
+	  {
+	      HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
+	  }
+	  if(msg == 2)
+	  {
+	      HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
+	  }
       }
   }
   /* USER CODE END StartReceiver1 */
+}
+
+/* USER CODE BEGIN Header_StartSender2 */
+/**
+* @brief Function implementing the Sender2 thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartSender2 */
+void StartSender2(void *argument)
+{
+  /* USER CODE BEGIN StartSender2 */
+  uint8_t msg = 2;
+  osThreadSuspend(Sender2Handle);
+
+  /* Infinite loop */
+  for(;;)
+  {
+      osDelay(1000);
+      Task_action('c');
+      osMessageQueuePut(Queue1Handle, &msg, 0, 200);
+      osThreadResume(Sender1Handle);
+      osThreadSuspend(Sender2Handle);
+  }
+  /* USER CODE END StartSender2 */
 }
 
 /**
