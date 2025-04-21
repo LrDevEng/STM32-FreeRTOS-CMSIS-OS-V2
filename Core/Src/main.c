@@ -50,22 +50,27 @@ UART_HandleTypeDef huart2;
 
 PCD_HandleTypeDef hpcd_USB_FS;
 
-/* Definitions for Task1 */
-osThreadId_t Task1Handle;
-const osThreadAttr_t Task1_attributes = {
-  .name = "Task1",
-  .stack_size = 256 * 4,
-  .priority = (osPriority_t) osPriorityNormal2,
-};
-/* Definitions for Task2 */
-osThreadId_t Task2Handle;
-const osThreadAttr_t Task2_attributes = {
-  .name = "Task2",
+/* Definitions for Sender1 */
+osThreadId_t Sender1Handle;
+const osThreadAttr_t Sender1_attributes = {
+  .name = "Sender1",
   .stack_size = 256 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
+/* Definitions for Receiver1 */
+osThreadId_t Receiver1Handle;
+const osThreadAttr_t Receiver1_attributes = {
+  .name = "Receiver1",
+  .stack_size = 256 * 4,
+  .priority = (osPriority_t) osPriorityNormal,
+};
+/* Definitions for Queue1 */
+osMessageQueueId_t Queue1Handle;
+const osMessageQueueAttr_t Queue1_attributes = {
+  .name = "Queue1"
+};
 /* USER CODE BEGIN PV */
-
+osStatus_t r1_State;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -76,8 +81,8 @@ static void MX_SPI1_Init(void);
 static void MX_USB_PCD_Init(void);
 static void MX_I2C2_Init(void);
 static void MX_USART2_UART_Init(void);
-void StartTask1(void *argument);
-void StartTask2(void *argument);
+void StartSender1(void *argument);
+void StartReceiver1(void *argument);
 
 /* USER CODE BEGIN PFP */
 void Task_action(char message);
@@ -141,16 +146,20 @@ int main(void)
   /* start timers, add new ones, ... */
   /* USER CODE END RTOS_TIMERS */
 
+  /* Create the queue(s) */
+  /* creation of Queue1 */
+  Queue1Handle = osMessageQueueNew (8, sizeof(uint8_t), &Queue1_attributes);
+
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
-  /* creation of Task1 */
-  Task1Handle = osThreadNew(StartTask1, NULL, &Task1_attributes);
+  /* creation of Sender1 */
+  Sender1Handle = osThreadNew(StartSender1, NULL, &Sender1_attributes);
 
-  /* creation of Task2 */
-  Task2Handle = osThreadNew(StartTask2, NULL, &Task2_attributes);
+  /* creation of Receiver1 */
+  Receiver1Handle = osThreadNew(StartReceiver1, NULL, &Receiver1_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -497,56 +506,53 @@ void Task_action(char message)
 }
 /* USER CODE END 4 */
 
-/* USER CODE BEGIN Header_StartTask1 */
+/* USER CODE BEGIN Header_StartSender1 */
 /**
-  * @brief  Function implementing the Task1 thread.
+  * @brief  Function implementing the Sender1 thread.
   * @param  argument: Not used
   * @retval None
   */
-/* USER CODE END Header_StartTask1 */
-void StartTask1(void *argument)
+/* USER CODE END Header_StartSender1 */
+void StartSender1(void *argument)
 {
   /* USER CODE BEGIN 5 */
-  osPriority_t prioTask2;
+  uint8_t msg = 0;
 
   /* Infinite loop */
   for(;;)
   {
-	prioTask2 = osThreadGetPriority(Task2Handle);
-
-	HAL_GPIO_WritePin(LD7_GPIO_Port, LD7_Pin, GPIO_PIN_SET);
-	Task_action('1');
-
-	osThreadSetPriority(Task2Handle, prioTask2+1);
-
-    HAL_Delay(1000); // keep task 1 busy for 1s - usually not good practice
+      Task_action('s');
+      osMessageQueuePut(Queue1Handle, &msg, 0, 200);
+      if(++msg >9)
+      {
+	  msg = 0;
+      }
+      osDelay(1000);
   }
   /* USER CODE END 5 */
 }
 
-/* USER CODE BEGIN Header_StartTask2 */
+/* USER CODE BEGIN Header_StartReceiver1 */
 /**
-* @brief Function implementing the Task2 thread.
+* @brief Function implementing the Receiver1 thread.
 * @param argument: Not used
 * @retval None
 */
-/* USER CODE END Header_StartTask2 */
-void StartTask2(void *argument)
+/* USER CODE END Header_StartReceiver1 */
+void StartReceiver1(void *argument)
 {
-  /* USER CODE BEGIN StartTask2 */
-  osPriority_t myPrio;
+  /* USER CODE BEGIN StartReceiver1 */
+  uint8_t msg = 0;
 
   /* Infinite loop */
   for(;;)
   {
-	myPrio = osThreadGetPriority(Task2Handle);
-
-    HAL_GPIO_WritePin(LD7_GPIO_Port, LD7_Pin, GPIO_PIN_RESET);
-	Task_action('2');
-
-	osThreadSetPriority(Task2Handle, myPrio-2);
+      Task_action('r');
+      r1_State = osMessageQueueGet(Queue1Handle, &msg, NULL, 2000);
+      Task_action(msg+48);
+      HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
   }
-  /* USER CODE END StartTask2 */
+  /* USER CODE END StartReceiver1 */
 }
 
 /**
