@@ -50,64 +50,34 @@ UART_HandleTypeDef huart2;
 
 PCD_HandleTypeDef hpcd_USB_FS;
 
-/* Definitions for TaskNorth */
-osThreadId_t TaskNorthHandle;
-const osThreadAttr_t TaskNorth_attributes = {
-  .name = "TaskNorth",
-  .stack_size = 256 * 4,
-  .priority = (osPriority_t) osPriorityNormal2,
-};
-/* Definitions for TaskNorthEast */
-osThreadId_t TaskNorthEastHandle;
-const osThreadAttr_t TaskNorthEast_attributes = {
-  .name = "TaskNorthEast",
+/* Definitions for Sender1 */
+osThreadId_t Sender1Handle;
+const osThreadAttr_t Sender1_attributes = {
+  .name = "Sender1",
   .stack_size = 256 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
-/* Definitions for TaskEast */
-osThreadId_t TaskEastHandle;
-const osThreadAttr_t TaskEast_attributes = {
-  .name = "TaskEast",
+/* Definitions for Receiver1 */
+osThreadId_t Receiver1Handle;
+const osThreadAttr_t Receiver1_attributes = {
+  .name = "Receiver1",
+  .stack_size = 256 * 4,
+  .priority = (osPriority_t) osPriorityAboveNormal,
+};
+/* Definitions for Sender2 */
+osThreadId_t Sender2Handle;
+const osThreadAttr_t Sender2_attributes = {
+  .name = "Sender2",
   .stack_size = 256 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
-/* Definitions for TaskSouthEast */
-osThreadId_t TaskSouthEastHandle;
-const osThreadAttr_t TaskSouthEast_attributes = {
-  .name = "TaskSouthEast",
-  .stack_size = 256 * 4,
-  .priority = (osPriority_t) osPriorityLow,
-};
-/* Definitions for TaskSouth */
-osThreadId_t TaskSouthHandle;
-const osThreadAttr_t TaskSouth_attributes = {
-  .name = "TaskSouth",
-  .stack_size = 256 * 4,
-  .priority = (osPriority_t) osPriorityNormal,
-};
-/* Definitions for TaskSouthWest */
-osThreadId_t TaskSouthWestHandle;
-const osThreadAttr_t TaskSouthWest_attributes = {
-  .name = "TaskSouthWest",
-  .stack_size = 256 * 4,
-  .priority = (osPriority_t) osPriorityNormal,
-};
-/* Definitions for TaskWest */
-osThreadId_t TaskWestHandle;
-const osThreadAttr_t TaskWest_attributes = {
-  .name = "TaskWest",
-  .stack_size = 256 * 4,
-  .priority = (osPriority_t) osPriorityNormal,
-};
-/* Definitions for TaskNorthWest */
-osThreadId_t TaskNorthWestHandle;
-const osThreadAttr_t TaskNorthWest_attributes = {
-  .name = "TaskNorthWest",
-  .stack_size = 256 * 4,
-  .priority = (osPriority_t) osPriorityNormal,
+/* Definitions for Queue1 */
+osMessageQueueId_t Queue1Handle;
+const osMessageQueueAttr_t Queue1_attributes = {
+  .name = "Queue1"
 };
 /* USER CODE BEGIN PV */
-
+osStatus_t r1_State;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -118,14 +88,9 @@ static void MX_SPI1_Init(void);
 static void MX_USB_PCD_Init(void);
 static void MX_I2C2_Init(void);
 static void MX_USART2_UART_Init(void);
-void StartTaskNorth(void *argument);
-void StartTaskNorthEast(void *argument);
-void StartTaskEast(void *argument);
-void StartTaskSouthEast(void *argument);
-void StartTaskSouth(void *argument);
-void StartTaskSouthWest(void *argument);
-void StartTaskWest(void *argument);
-void StartTaskNorthWest(void *argument);
+void StartSender1(void *argument);
+void StartReceiver1(void *argument);
+void StartSender2(void *argument);
 
 /* USER CODE BEGIN PFP */
 void Task_action(char message);
@@ -189,34 +154,23 @@ int main(void)
   /* start timers, add new ones, ... */
   /* USER CODE END RTOS_TIMERS */
 
+  /* Create the queue(s) */
+  /* creation of Queue1 */
+  Queue1Handle = osMessageQueueNew (8, sizeof(uint8_t), &Queue1_attributes);
+
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
-  /* creation of TaskNorth */
-  TaskNorthHandle = osThreadNew(StartTaskNorth, NULL, &TaskNorth_attributes);
+  /* creation of Sender1 */
+  Sender1Handle = osThreadNew(StartSender1, NULL, &Sender1_attributes);
 
-  /* creation of TaskNorthEast */
-  TaskNorthEastHandle = osThreadNew(StartTaskNorthEast, NULL, &TaskNorthEast_attributes);
+  /* creation of Receiver1 */
+  Receiver1Handle = osThreadNew(StartReceiver1, NULL, &Receiver1_attributes);
 
-  /* creation of TaskEast */
-  TaskEastHandle = osThreadNew(StartTaskEast, NULL, &TaskEast_attributes);
-
-  /* creation of TaskSouthEast */
-  TaskSouthEastHandle = osThreadNew(StartTaskSouthEast, NULL, &TaskSouthEast_attributes);
-
-  /* creation of TaskSouth */
-  TaskSouthHandle = osThreadNew(StartTaskSouth, NULL, &TaskSouth_attributes);
-
-  /* creation of TaskSouthWest */
-  TaskSouthWestHandle = osThreadNew(StartTaskSouthWest, NULL, &TaskSouthWest_attributes);
-
-  /* creation of TaskWest */
-  TaskWestHandle = osThreadNew(StartTaskWest, NULL, &TaskWest_attributes);
-
-  /* creation of TaskNorthWest */
-  TaskNorthWestHandle = osThreadNew(StartTaskNorthWest, NULL, &TaskNorthWest_attributes);
+  /* creation of Sender2 */
+  Sender2Handle = osThreadNew(StartSender2, NULL, &Sender2_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -563,204 +517,87 @@ void Task_action(char message)
 }
 /* USER CODE END 4 */
 
-/* USER CODE BEGIN Header_StartTaskNorth */
+/* USER CODE BEGIN Header_StartSender1 */
 /**
-  * @brief  Function implementing the TaskNorth thread.
+  * @brief  Function implementing the Sender1 thread.
   * @param  argument: Not used
   * @retval None
   */
-/* USER CODE END Header_StartTaskNorth */
-void StartTaskNorth(void *argument)
+/* USER CODE END Header_StartSender1 */
+void StartSender1(void *argument)
 {
   /* USER CODE BEGIN 5 */
-
+  uint8_t msg = 1;
 
   /* Infinite loop */
   for(;;)
   {
-      HAL_GPIO_WritePin(LD4_GPIO_Port, LD4_Pin, GPIO_PIN_RESET);
-      HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
-      Task_action('1');
       osDelay(1000);
-      osThreadResume(TaskNorthEastHandle);
-      osThreadSuspend(TaskNorthHandle);
+      Task_action('s');
+      osMessageQueuePut(Queue1Handle, &msg, 0, 200);
+      osThreadResume(Sender2Handle);
+      osThreadSuspend(Sender1Handle);
   }
   /* USER CODE END 5 */
 }
 
-/* USER CODE BEGIN Header_StartTaskNorthEast */
+/* USER CODE BEGIN Header_StartReceiver1 */
 /**
-* @brief Function implementing the TaskNorthEast thread.
+* @brief Function implementing the Receiver1 thread.
 * @param argument: Not used
 * @retval None
 */
-/* USER CODE END Header_StartTaskNorthEast */
-void StartTaskNorthEast(void *argument)
+/* USER CODE END Header_StartReceiver1 */
+void StartReceiver1(void *argument)
 {
-  /* USER CODE BEGIN StartTaskNorthEast */
-  osThreadSuspend(TaskNorthEastHandle);
+  /* USER CODE BEGIN StartReceiver1 */
+  uint8_t msg = 0;
 
   /* Infinite loop */
   for(;;)
   {
-      HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
-      HAL_GPIO_WritePin(LD5_GPIO_Port, LD5_Pin, GPIO_PIN_SET);
-      Task_action('2');
-      osDelay(1000);
-      osThreadResume(TaskEastHandle);
-      osThreadSuspend(TaskNorthEastHandle);
+      Task_action('r');
+      r1_State = osMessageQueueGet(Queue1Handle, &msg, NULL, osWaitForever);
+
+      if(r1_State == osOK)
+      {
+	  Task_action(msg+48);
+	  if(msg == 1)
+	  {
+	      HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
+	  }
+	  if(msg == 2)
+	  {
+	      HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
+	  }
+      }
   }
-  /* USER CODE END StartTaskNorthEast */
+  /* USER CODE END StartReceiver1 */
 }
 
-/* USER CODE BEGIN Header_StartTaskEast */
+/* USER CODE BEGIN Header_StartSender2 */
 /**
-* @brief Function implementing the TaskEast thread.
+* @brief Function implementing the Sender2 thread.
 * @param argument: Not used
 * @retval None
 */
-/* USER CODE END Header_StartTaskEast */
-void StartTaskEast(void *argument)
+/* USER CODE END Header_StartSender2 */
+void StartSender2(void *argument)
 {
-  /* USER CODE BEGIN StartTaskEast */
-  osThreadSuspend(TaskEastHandle);
+  /* USER CODE BEGIN StartSender2 */
+  uint8_t msg = 2;
+  osThreadSuspend(Sender2Handle);
 
   /* Infinite loop */
   for(;;)
   {
-      HAL_GPIO_WritePin(LD5_GPIO_Port, LD5_Pin, GPIO_PIN_RESET);
-      HAL_GPIO_WritePin(LD7_GPIO_Port, LD7_Pin, GPIO_PIN_SET);
-      Task_action('3');
       osDelay(1000);
-      osThreadResume(TaskSouthEastHandle);
-      osThreadSuspend(TaskEastHandle);
+      Task_action('c');
+      osMessageQueuePut(Queue1Handle, &msg, 0, 200);
+      osThreadResume(Sender1Handle);
+      osThreadSuspend(Sender2Handle);
   }
-  /* USER CODE END StartTaskEast */
-}
-
-/* USER CODE BEGIN Header_StartTaskSouthEast */
-/**
-* @brief Function implementing the TaskSouthEast thread.
-* @param argument: Not used
-* @retval None
-*/
-/* USER CODE END Header_StartTaskSouthEast */
-void StartTaskSouthEast(void *argument)
-{
-  /* USER CODE BEGIN StartTaskSouthEast */
-  osThreadSuspend(TaskSouthEastHandle);
-
-  /* Infinite loop */
-  for(;;)
-  {
-      HAL_GPIO_WritePin(LD7_GPIO_Port, LD7_Pin, GPIO_PIN_RESET);
-      HAL_GPIO_WritePin(LD9_GPIO_Port, LD9_Pin, GPIO_PIN_SET);
-      Task_action('4');
-      osDelay(1000);
-      osThreadResume(TaskSouthHandle);
-      osThreadSuspend(TaskSouthEastHandle);
-  }
-  /* USER CODE END StartTaskSouthEast */
-}
-
-/* USER CODE BEGIN Header_StartTaskSouth */
-/**
-* @brief Function implementing the TaskSouth thread.
-* @param argument: Not used
-* @retval None
-*/
-/* USER CODE END Header_StartTaskSouth */
-void StartTaskSouth(void *argument)
-{
-  /* USER CODE BEGIN StartTaskSouth */
-  osThreadSuspend(TaskSouthHandle);
-
-  /* Infinite loop */
-  for(;;)
-  {
-      HAL_GPIO_WritePin(LD9_GPIO_Port, LD9_Pin, GPIO_PIN_RESET);
-      HAL_GPIO_WritePin(LD10_GPIO_Port, LD10_Pin, GPIO_PIN_SET);
-      Task_action('5');
-      osDelay(1000);
-      osThreadResume(TaskSouthWestHandle);
-      osThreadSuspend(TaskSouthHandle);
-  }
-  /* USER CODE END StartTaskSouth */
-}
-
-/* USER CODE BEGIN Header_StartTaskSouthWest */
-/**
-* @brief Function implementing the TaskSouthWest thread.
-* @param argument: Not used
-* @retval None
-*/
-/* USER CODE END Header_StartTaskSouthWest */
-void StartTaskSouthWest(void *argument)
-{
-  /* USER CODE BEGIN StartTaskSouthWest */
-  osThreadSuspend(TaskSouthWestHandle);
-
-  /* Infinite loop */
-  for(;;)
-  {
-      HAL_GPIO_WritePin(LD10_GPIO_Port, LD10_Pin, GPIO_PIN_RESET);
-      HAL_GPIO_WritePin(LD8_GPIO_Port, LD8_Pin, GPIO_PIN_SET);
-      Task_action('6');
-      osDelay(1000);
-      osThreadResume(TaskWestHandle);
-      osThreadSuspend(TaskSouthWestHandle);
-  }
-  /* USER CODE END StartTaskSouthWest */
-}
-
-/* USER CODE BEGIN Header_StartTaskWest */
-/**
-* @brief Function implementing the TaskWest thread.
-* @param argument: Not used
-* @retval None
-*/
-/* USER CODE END Header_StartTaskWest */
-void StartTaskWest(void *argument)
-{
-  /* USER CODE BEGIN StartTaskWest */
-  osThreadSuspend(TaskWestHandle);
-
-  /* Infinite loop */
-  for(;;)
-  {
-      HAL_GPIO_WritePin(LD8_GPIO_Port, LD8_Pin, GPIO_PIN_RESET);
-      HAL_GPIO_WritePin(LD6_GPIO_Port, LD6_Pin, GPIO_PIN_SET);
-      Task_action('7');
-      osDelay(1000);
-      osThreadResume(TaskNorthWestHandle);
-      osThreadSuspend(TaskWestHandle);
-  }
-  /* USER CODE END StartTaskWest */
-}
-
-/* USER CODE BEGIN Header_StartTaskNorthWest */
-/**
-* @brief Function implementing the TaskNorthWest thread.
-* @param argument: Not used
-* @retval None
-*/
-/* USER CODE END Header_StartTaskNorthWest */
-void StartTaskNorthWest(void *argument)
-{
-  /* USER CODE BEGIN StartTaskNorthWest */
-  osThreadSuspend(TaskNorthWestHandle);
-
-  /* Infinite loop */
-  for(;;)
-  {
-      HAL_GPIO_WritePin(LD6_GPIO_Port, LD6_Pin, GPIO_PIN_RESET);
-      HAL_GPIO_WritePin(LD4_GPIO_Port, LD4_Pin, GPIO_PIN_SET);
-      Task_action('8');
-      osDelay(1000);
-      osThreadResume(TaskNorthHandle);
-      osThreadSuspend(TaskNorthWestHandle);
-  }
-  /* USER CODE END StartTaskNorthWest */
+  /* USER CODE END StartSender2 */
 }
 
 /**
