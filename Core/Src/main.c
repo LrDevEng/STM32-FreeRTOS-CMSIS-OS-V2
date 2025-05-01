@@ -57,13 +57,6 @@ const osThreadAttr_t Sender1_attributes = {
   .stack_size = 256 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
-/* Definitions for Receiver1 */
-osThreadId_t Receiver1Handle;
-const osThreadAttr_t Receiver1_attributes = {
-  .name = "Receiver1",
-  .stack_size = 256 * 4,
-  .priority = (osPriority_t) osPriorityNormal,
-};
 /* Definitions for Sender2 */
 osThreadId_t Sender2Handle;
 const osThreadAttr_t Sender2_attributes = {
@@ -71,10 +64,10 @@ const osThreadAttr_t Sender2_attributes = {
   .stack_size = 256 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
-/* Definitions for Queue1 */
-osMessageQueueId_t Queue1Handle;
-const osMessageQueueAttr_t Queue1_attributes = {
-  .name = "Queue1"
+/* Definitions for myBinarySem01 */
+osSemaphoreId_t myBinarySem01Handle;
+const osSemaphoreAttr_t myBinarySem01_attributes = {
+  .name = "myBinarySem01"
 };
 /* USER CODE BEGIN PV */
 osStatus_t r1_State;
@@ -96,7 +89,6 @@ static void MX_USB_PCD_Init(void);
 static void MX_I2C2_Init(void);
 static void MX_USART2_UART_Init(void);
 void StartSender1(void *argument);
-void StartReceiver1(void *argument);
 void StartSender2(void *argument);
 
 /* USER CODE BEGIN PFP */
@@ -153,6 +145,10 @@ int main(void)
   /* add mutexes, ... */
   /* USER CODE END RTOS_MUTEX */
 
+  /* Create the semaphores(s) */
+  /* creation of myBinarySem01 */
+  myBinarySem01Handle = osSemaphoreNew(1, 1, &myBinarySem01_attributes);
+
   /* USER CODE BEGIN RTOS_SEMAPHORES */
   /* add semaphores, ... */
   /* USER CODE END RTOS_SEMAPHORES */
@@ -161,10 +157,6 @@ int main(void)
   /* start timers, add new ones, ... */
   /* USER CODE END RTOS_TIMERS */
 
-  /* Create the queue(s) */
-  /* creation of Queue1 */
-  Queue1Handle = osMessageQueueNew (8, sizeof(MyData), &Queue1_attributes);
-
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
   /* USER CODE END RTOS_QUEUES */
@@ -172,9 +164,6 @@ int main(void)
   /* Create the thread(s) */
   /* creation of Sender1 */
   Sender1Handle = osThreadNew(StartSender1, NULL, &Sender1_attributes);
-
-  /* creation of Receiver1 */
-  Receiver1Handle = osThreadNew(StartReceiver1, NULL, &Receiver1_attributes);
 
   /* creation of Sender2 */
   Sender2Handle = osThreadNew(StartSender2, NULL, &Sender2_attributes);
@@ -522,6 +511,12 @@ void Task_action(char message)
   ITM_SendChar(message);
   ITM_SendChar('\n');
 }
+
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+  Task_action('!');
+  osSemaphoreRelease(myBinarySem01Handle);
+}
 /* USER CODE END 4 */
 
 /* USER CODE BEGIN Header_StartSender1 */
@@ -534,53 +529,15 @@ void Task_action(char message)
 void StartSender1(void *argument)
 {
   /* USER CODE BEGIN 5 */
-  static MyData dataToSend = {'s',1};
 
   /* Infinite loop */
   for(;;)
   {
-      Task_action(dataToSend.Configuration);
-      osMessageQueuePut(Queue1Handle, &dataToSend, 0, 200);
-      osDelay(1000);
-      osThreadResume(Sender2Handle);
-      osThreadSuspend(Sender1Handle);
+      Task_action('1');
+      osSemaphoreRelease(myBinarySem01Handle);
+      osDelay(2000);
   }
   /* USER CODE END 5 */
-}
-
-/* USER CODE BEGIN Header_StartReceiver1 */
-/**
-* @brief Function implementing the Receiver1 thread.
-* @param argument: Not used
-* @retval None
-*/
-/* USER CODE END Header_StartReceiver1 */
-void StartReceiver1(void *argument)
-{
-  /* USER CODE BEGIN StartReceiver1 */
-  MyData dataReceived;
-
-  /* Infinite loop */
-  for(;;)
-  {
-      ITM_SendChar('R');
-      ITM_SendChar(':');
-      r1_State = osMessageQueueGet(Queue1Handle, &dataReceived, NULL, osWaitForever);
-
-      if(r1_State == osOK)
-      {
-	  Task_action(dataReceived.Configuration);
-	  if(dataReceived.Source == 1)
-	  {
-	      HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
-	  }
-	  if(dataReceived.Source == 2)
-	  {
-	      HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
-	  }
-      }
-  }
-  /* USER CODE END StartReceiver1 */
 }
 
 /* USER CODE BEGIN Header_StartSender2 */
@@ -593,17 +550,13 @@ void StartReceiver1(void *argument)
 void StartSender2(void *argument)
 {
   /* USER CODE BEGIN StartSender2 */
-  static MyData dataToSend = {'c',2};
-  osThreadSuspend(Sender2Handle);
 
   /* Infinite loop */
   for(;;)
   {
-      Task_action(dataToSend.Configuration);
-      osMessageQueuePut(Queue1Handle, &dataToSend, 0, 200);
-      osDelay(1000);
-      osThreadResume(Sender1Handle);
-      osThreadSuspend(Sender2Handle);
+      osSemaphoreAcquire(myBinarySem01Handle,osWaitForever);
+      Task_action('2');
+      HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
   }
   /* USER CODE END StartSender2 */
 }
