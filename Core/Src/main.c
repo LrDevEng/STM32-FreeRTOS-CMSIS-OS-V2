@@ -64,10 +64,17 @@ const osThreadAttr_t Sender2_attributes = {
   .stack_size = 256 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
-/* Definitions for myBinarySem01 */
-osSemaphoreId_t myBinarySem01Handle;
-const osSemaphoreAttr_t myBinarySem01_attributes = {
-  .name = "myBinarySem01"
+/* Definitions for Blinker */
+osThreadId_t BlinkerHandle;
+const osThreadAttr_t Blinker_attributes = {
+  .name = "Blinker",
+  .stack_size = 256 * 4,
+  .priority = (osPriority_t) osPriorityNormal,
+};
+/* Definitions for myCountingSem01 */
+osSemaphoreId_t myCountingSem01Handle;
+const osSemaphoreAttr_t myCountingSem01_attributes = {
+  .name = "myCountingSem01"
 };
 /* USER CODE BEGIN PV */
 osStatus_t r1_State;
@@ -90,6 +97,7 @@ static void MX_I2C2_Init(void);
 static void MX_USART2_UART_Init(void);
 void StartSender1(void *argument);
 void StartSender2(void *argument);
+void StartBlinker(void *argument);
 
 /* USER CODE BEGIN PFP */
 void Task_action(char message);
@@ -146,8 +154,8 @@ int main(void)
   /* USER CODE END RTOS_MUTEX */
 
   /* Create the semaphores(s) */
-  /* creation of myBinarySem01 */
-  myBinarySem01Handle = osSemaphoreNew(1, 1, &myBinarySem01_attributes);
+  /* creation of myCountingSem01 */
+  myCountingSem01Handle = osSemaphoreNew(2, 0, &myCountingSem01_attributes);
 
   /* USER CODE BEGIN RTOS_SEMAPHORES */
   /* add semaphores, ... */
@@ -167,6 +175,9 @@ int main(void)
 
   /* creation of Sender2 */
   Sender2Handle = osThreadNew(StartSender2, NULL, &Sender2_attributes);
+
+  /* creation of Blinker */
+  BlinkerHandle = osThreadNew(StartBlinker, NULL, &Blinker_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -515,7 +526,8 @@ void Task_action(char message)
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
   Task_action('!');
-  osSemaphoreRelease(myBinarySem01Handle);
+  osSemaphoreRelease(myCountingSem01Handle);
+  osSemaphoreRelease(myCountingSem01Handle);
 }
 /* USER CODE END 4 */
 
@@ -534,7 +546,7 @@ void StartSender1(void *argument)
   for(;;)
   {
       Task_action('1');
-      osSemaphoreRelease(myBinarySem01Handle);
+      osSemaphoreRelease(myCountingSem01Handle);
       osDelay(2000);
   }
   /* USER CODE END 5 */
@@ -554,11 +566,41 @@ void StartSender2(void *argument)
   /* Infinite loop */
   for(;;)
   {
-      osSemaphoreAcquire(myBinarySem01Handle,osWaitForever);
       Task_action('2');
-      HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
+      osSemaphoreRelease(myCountingSem01Handle);
+      osDelay(2000);
   }
   /* USER CODE END StartSender2 */
+}
+
+/* USER CODE BEGIN Header_StartBlinker */
+/**
+* @brief Function implementing the Blinker thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartBlinker */
+void StartBlinker(void *argument)
+{
+  /* USER CODE BEGIN StartBlinker */
+  static uint8_t cnt = 0;
+
+  /* Infinite loop */
+  for(;;)
+  {
+      osStatus_t status = osSemaphoreAcquire(myCountingSem01Handle,osWaitForever);
+      if(status == 0)
+      {
+	  cnt++;
+      }
+      if(cnt > 1)
+      {
+	  Task_action('3');
+	  HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
+	  cnt = 0;
+      }
+  }
+  /* USER CODE END StartBlinker */
 }
 
 /**
