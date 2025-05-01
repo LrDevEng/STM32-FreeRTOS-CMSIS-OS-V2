@@ -62,7 +62,7 @@ osThreadId_t Receiver1Handle;
 const osThreadAttr_t Receiver1_attributes = {
   .name = "Receiver1",
   .stack_size = 256 * 4,
-  .priority = (osPriority_t) osPriorityAboveNormal,
+  .priority = (osPriority_t) osPriorityNormal,
 };
 /* Definitions for Sender2 */
 osThreadId_t Sender2Handle;
@@ -78,6 +78,13 @@ const osMessageQueueAttr_t Queue1_attributes = {
 };
 /* USER CODE BEGIN PV */
 osStatus_t r1_State;
+
+typedef struct
+{
+  uint16_t Configuration;
+  uint8_t Source;
+} MyData;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -156,7 +163,7 @@ int main(void)
 
   /* Create the queue(s) */
   /* creation of Queue1 */
-  Queue1Handle = osMessageQueueNew (8, sizeof(uint8_t), &Queue1_attributes);
+  Queue1Handle = osMessageQueueNew (8, sizeof(MyData), &Queue1_attributes);
 
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
@@ -527,14 +534,14 @@ void Task_action(char message)
 void StartSender1(void *argument)
 {
   /* USER CODE BEGIN 5 */
-  uint8_t msg = 1;
+  static MyData dataToSend = {'s',1};
 
   /* Infinite loop */
   for(;;)
   {
+      Task_action(dataToSend.Configuration);
+      osMessageQueuePut(Queue1Handle, &dataToSend, 0, 200);
       osDelay(1000);
-      Task_action('s');
-      osMessageQueuePut(Queue1Handle, &msg, 0, 200);
       osThreadResume(Sender2Handle);
       osThreadSuspend(Sender1Handle);
   }
@@ -551,22 +558,23 @@ void StartSender1(void *argument)
 void StartReceiver1(void *argument)
 {
   /* USER CODE BEGIN StartReceiver1 */
-  uint8_t msg = 0;
+  MyData dataReceived;
 
   /* Infinite loop */
   for(;;)
   {
-      Task_action('r');
-      r1_State = osMessageQueueGet(Queue1Handle, &msg, NULL, osWaitForever);
+      ITM_SendChar('R');
+      ITM_SendChar(':');
+      r1_State = osMessageQueueGet(Queue1Handle, &dataReceived, NULL, osWaitForever);
 
       if(r1_State == osOK)
       {
-	  Task_action(msg+48);
-	  if(msg == 1)
+	  Task_action(dataReceived.Configuration);
+	  if(dataReceived.Source == 1)
 	  {
 	      HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_SET);
 	  }
-	  if(msg == 2)
+	  if(dataReceived.Source == 2)
 	  {
 	      HAL_GPIO_WritePin(LD3_GPIO_Port, LD3_Pin, GPIO_PIN_RESET);
 	  }
@@ -585,15 +593,15 @@ void StartReceiver1(void *argument)
 void StartSender2(void *argument)
 {
   /* USER CODE BEGIN StartSender2 */
-  uint8_t msg = 2;
+  static MyData dataToSend = {'c',2};
   osThreadSuspend(Sender2Handle);
 
   /* Infinite loop */
   for(;;)
   {
+      Task_action(dataToSend.Configuration);
+      osMessageQueuePut(Queue1Handle, &dataToSend, 0, 200);
       osDelay(1000);
-      Task_action('c');
-      osMessageQueuePut(Queue1Handle, &msg, 0, 200);
       osThreadResume(Sender1Handle);
       osThreadSuspend(Sender2Handle);
   }
