@@ -64,6 +64,11 @@ const osThreadAttr_t Task2_attributes = {
   .stack_size = 256 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
+/* Definitions for myMutex01 */
+osMutexId_t myMutex01Handle;
+const osMutexAttr_t myMutex01_attributes = {
+  .name = "myMutex01"
+};
 /* Definitions for myCountingSem01 */
 osSemaphoreId_t myCountingSem01Handle;
 const osSemaphoreAttr_t myCountingSem01_attributes = {
@@ -142,6 +147,9 @@ int main(void)
 
   /* Init scheduler */
   osKernelInitialize();
+  /* Create the mutex(es) */
+  /* creation of myMutex01 */
+  myMutex01Handle = osMutexNew(&myMutex01_attributes);
 
   /* USER CODE BEGIN RTOS_MUTEX */
   /* add mutexes, ... */
@@ -535,9 +543,12 @@ void StartTask1(void *argument)
   /* Infinite loop */
   for(;;)
   {
-      osThreadFlagsWait(0x51, osFlagsWaitAll, osWaitForever);
+      osMutexAcquire(myMutex01Handle,osWaitForever);
       Task_action('1');
       HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
+      osDelay(1000);
+      osMutexRelease(myMutex01Handle);
+      osDelay(100);
   }
   /* USER CODE END 5 */
 }
@@ -555,9 +566,12 @@ void StartTask2(void *argument)
   /* Infinite loop */
   for(;;)
   {
-      osThreadFlagsSet(Task1Handle, 0x50);
+      osMutexAcquire(myMutex01Handle,osWaitForever);
       Task_action('2');
-      osDelay(3000);
+      HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
+      osDelay(1000);
+      osMutexRelease(myMutex01Handle);
+      osDelay(100);
   }
   /* USER CODE END StartTask2 */
 }
