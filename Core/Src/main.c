@@ -50,24 +50,24 @@ UART_HandleTypeDef huart2;
 
 PCD_HandleTypeDef hpcd_USB_FS;
 
-/* Definitions for Sender1 */
-osThreadId_t Sender1Handle;
-const osThreadAttr_t Sender1_attributes = {
-  .name = "Sender1",
+/* Definitions for Task1 */
+osThreadId_t Task1Handle;
+const osThreadAttr_t Task1_attributes = {
+  .name = "Task1",
   .stack_size = 256 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
-/* Definitions for Sender2 */
-osThreadId_t Sender2Handle;
-const osThreadAttr_t Sender2_attributes = {
-  .name = "Sender2",
+/* Definitions for Task2 */
+osThreadId_t Task2Handle;
+const osThreadAttr_t Task2_attributes = {
+  .name = "Task2",
   .stack_size = 256 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
-/* Definitions for Blinker */
-osThreadId_t BlinkerHandle;
-const osThreadAttr_t Blinker_attributes = {
-  .name = "Blinker",
+/* Definitions for Task3 */
+osThreadId_t Task3Handle;
+const osThreadAttr_t Task3_attributes = {
+  .name = "Task3",
   .stack_size = 256 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
@@ -85,6 +85,8 @@ typedef struct
   uint8_t Source;
 } MyData;
 
+osEventFlagsId_t EventGroup1;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -95,9 +97,9 @@ static void MX_SPI1_Init(void);
 static void MX_USB_PCD_Init(void);
 static void MX_I2C2_Init(void);
 static void MX_USART2_UART_Init(void);
-void StartSender1(void *argument);
-void StartSender2(void *argument);
-void StartBlinker(void *argument);
+void StartTask1(void *argument);
+void StartTask2(void *argument);
+void StartTask3(void *argument);
 
 /* USER CODE BEGIN PFP */
 void Task_action(char message);
@@ -170,17 +172,17 @@ int main(void)
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
-  /* creation of Sender1 */
-  Sender1Handle = osThreadNew(StartSender1, NULL, &Sender1_attributes);
+  /* creation of Task1 */
+  Task1Handle = osThreadNew(StartTask1, NULL, &Task1_attributes);
 
-  /* creation of Sender2 */
-  Sender2Handle = osThreadNew(StartSender2, NULL, &Sender2_attributes);
+  /* creation of Task2 */
+  Task2Handle = osThreadNew(StartTask2, NULL, &Task2_attributes);
 
-  /* creation of Blinker */
-  BlinkerHandle = osThreadNew(StartBlinker, NULL, &Blinker_attributes);
+  /* creation of Task3 */
+  Task3Handle = osThreadNew(StartTask3, NULL, &Task3_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
-  /* add threads, ... */
+  EventGroup1 = osEventFlagsNew(NULL);
   /* USER CODE END RTOS_THREADS */
 
   /* USER CODE BEGIN RTOS_EVENTS */
@@ -525,82 +527,68 @@ void Task_action(char message)
 
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
 {
+  osEventFlagsSet(EventGroup1, 0x50);
   Task_action('!');
-  osSemaphoreRelease(myCountingSem01Handle);
-  osSemaphoreRelease(myCountingSem01Handle);
 }
 /* USER CODE END 4 */
 
-/* USER CODE BEGIN Header_StartSender1 */
+/* USER CODE BEGIN Header_StartTask1 */
 /**
-  * @brief  Function implementing the Sender1 thread.
+  * @brief  Function implementing the Task1 thread.
   * @param  argument: Not used
   * @retval None
   */
-/* USER CODE END Header_StartSender1 */
-void StartSender1(void *argument)
+/* USER CODE END Header_StartTask1 */
+void StartTask1(void *argument)
 {
   /* USER CODE BEGIN 5 */
 
   /* Infinite loop */
   for(;;)
   {
+      osEventFlagsWait(EventGroup1, 0x51, osFlagsWaitAll, osWaitForever);
       Task_action('1');
-      osSemaphoreRelease(myCountingSem01Handle);
-      osDelay(2000);
+      HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
   }
   /* USER CODE END 5 */
 }
 
-/* USER CODE BEGIN Header_StartSender2 */
+/* USER CODE BEGIN Header_StartTask2 */
 /**
-* @brief Function implementing the Sender2 thread.
+* @brief Function implementing the Task2 thread.
 * @param argument: Not used
 * @retval None
 */
-/* USER CODE END Header_StartSender2 */
-void StartSender2(void *argument)
+/* USER CODE END Header_StartTask2 */
+void StartTask2(void *argument)
 {
-  /* USER CODE BEGIN StartSender2 */
-
+  /* USER CODE BEGIN StartTask2 */
   /* Infinite loop */
   for(;;)
   {
+      osEventFlagsSet(EventGroup1, 0x01);
       Task_action('2');
-      osSemaphoreRelease(myCountingSem01Handle);
-      osDelay(2000);
+      osDelay(3000);
   }
-  /* USER CODE END StartSender2 */
+  /* USER CODE END StartTask2 */
 }
 
-/* USER CODE BEGIN Header_StartBlinker */
+/* USER CODE BEGIN Header_StartTask3 */
 /**
-* @brief Function implementing the Blinker thread.
+* @brief Function implementing the Task3 thread.
 * @param argument: Not used
 * @retval None
 */
-/* USER CODE END Header_StartBlinker */
-void StartBlinker(void *argument)
+/* USER CODE END Header_StartTask3 */
+void StartTask3(void *argument)
 {
-  /* USER CODE BEGIN StartBlinker */
-  static uint8_t cnt = 0;
-
+  /* USER CODE BEGIN StartTask3 */
   /* Infinite loop */
   for(;;)
   {
-      osStatus_t status = osSemaphoreAcquire(myCountingSem01Handle,osWaitForever);
-      if(status == 0)
-      {
-	  cnt++;
-      }
-      if(cnt > 1)
-      {
-	  Task_action('3');
-	  HAL_GPIO_TogglePin(LD3_GPIO_Port, LD3_Pin);
-	  cnt = 0;
-      }
+    osDelay(1000);
   }
-  /* USER CODE END StartBlinker */
+  /* USER CODE END StartTask3 */
 }
 
 /**
